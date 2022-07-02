@@ -70,7 +70,7 @@ public class SaveFile
     private Dictionary<string, object> m_Dictionary = new Dictionary<string, object>();
     private JavaScriptSerializer m_Serializer = new JavaScriptSerializer();
 
-	private const int m_CryptInt = 64;
+	private const int m_ObscureInt = 64;
 
     public object GetValue(string key)
     {
@@ -114,7 +114,7 @@ public class SaveFile
 
         byte[] byteArray = Convert.FromBase64String(data);
 
-        Crypt(ref byteArray);
+        Obsure(ref byteArray);
         
         return UTF8Encoding.UTF8.GetString(byteArray);
     }
@@ -128,16 +128,16 @@ public class SaveFile
 
         byte[] byteArray = UTF8Encoding.UTF8.GetBytes(data);
 
-        Crypt(ref byteArray);
+        Obscure(ref byteArray);
         
         return Convert.ToBase64String(byteArray);
     }
 
-    private void Crypt(ref byte[] byteArray)
+    private void Obscure(ref byte[] byteArray)
     {
         for (int i = 0; i < byteArray.Length; i++)
         {
-            byteArray[i] ^= m_CryptInt;
+            byteArray[i] ^= m_ObscureInt;
         }
     }
 }

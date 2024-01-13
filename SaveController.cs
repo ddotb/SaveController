@@ -3,25 +3,34 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Web.Script.Serialization;
+using System.Text.Json;
 using UnityEngine;
+using UnityEngine.Rendering;
 
-public class SaveController : MonoBehaviour
+public class SaveController : Singleton<SaveController>
 {
-    private SaveFile m_SaveFile = new SaveFile();
+    [SerializeField] private bool m_ObscureSave = true;
+    
+    private SaveFile m_SaveFile;
 
     private const string m_SaveFileName = "SaveGame.sav";
     private const int m_SaveFileVersion = 1;
+
+    public bool ObscureSave => m_ObscureSave;
     
     private void Awake()
     {
+        m_SaveFile = new SaveFile(this);
+        
         DontDestroyOnLoad(gameObject);
 
         if (FileExists())
         {
             LoadFromFile();
 
-            if ((int)m_SaveFile.GetValue(SaveValueKeys.SAVE_FILE_VERSION) != m_SaveFileVersion)
+            int saveFileVersion = Convert.ToInt32(m_SaveFile.GetValue(SaveValueKeys.SAVE_FILE_VERSION));
+            
+            if (saveFileVersion != m_SaveFileVersion)
             {
                 Debug.LogWarning("Save file version mismatch.");
             }
@@ -30,17 +39,17 @@ public class SaveController : MonoBehaviour
 
     private void Start()
     {
-        SetValue(SaveValueKeys.SAVE_FILE_VERSION, m_SaveFileVersion);
+        SetValue(SaveValueKeys.SAVE_FILE_VERSION, m_SaveFileVersion.ToString());
 
         SaveToFile();
     }
 
-    public object GetValue(string key)
+    public string GetValue(string key)
     {
         return m_SaveFile.GetValue(key);
     }
 
-    public void SetValue(string key, object value)
+    public void SetValue(string key, string value)
     {
         m_SaveFile.SetValue(key, value);
         
@@ -59,7 +68,7 @@ public class SaveController : MonoBehaviour
 
     private void SaveToFile()
     {
-        m_SaveFile.SetValue(SaveValueKeys.SAVE_TIMESTAMP, DateTime.UtcNow);
+        m_SaveFile.SetValue(SaveValueKeys.SAVE_TIMESTAMP, DateTime.UtcNow.ToString());
         
         m_SaveFile.SaveToFile(m_SaveFileName);
     }
@@ -67,12 +76,18 @@ public class SaveController : MonoBehaviour
 
 public class SaveFile
 {
-    private Dictionary<string, object> m_Dictionary = new Dictionary<string, object>();
-    private JavaScriptSerializer m_Serializer = new JavaScriptSerializer();
+    private SaveController m_SaveController;
+    
+    private SerializedDictionary<string, string> m_Dictionary = new SerializedDictionary<string, string>();
 
-	private const int m_ObscureInt = 64;
+    private const int m_ObscureInt = 64;
 
-    public object GetValue(string key)
+    public SaveFile(SaveController controller)
+    {
+        m_SaveController = controller;
+    }
+    
+    public string GetValue(string key)
     {
         if (!m_Dictionary.ContainsKey(key))
         {
@@ -82,7 +97,7 @@ public class SaveFile
         return m_Dictionary[key];
     }
 
-    public void SetValue(string key, object value)
+    public void SetValue(string key, string value)
     {
         m_Dictionary[key] = value;
     }
@@ -90,22 +105,22 @@ public class SaveFile
     public void LoadFromFile(string fileName)
     {
         string saveText = File.ReadAllText(Application.persistentDataPath + "/" + fileName);
-
-        saveText = FromEncryptedBase64(saveText);
         
-        m_Dictionary = m_Serializer.Deserialize<Dictionary<string, object>>(saveText);
+        saveText = FromObscuredBase64(saveText);
+
+        m_Dictionary = JsonUtility.FromJson<SerializedDictionary<string, string>>(saveText);
     }
     
     public void SaveToFile(string fileName)
     {
-        string saveText = m_Serializer.Serialize(m_Dictionary);
+        string saveText = JsonUtility.ToJson(m_Dictionary);
 
-        saveText = ToEncryptedBase64(saveText);
+        saveText = ToObscuredBase64(saveText);
         
         File.WriteAllText(Application.persistentDataPath + "/" + fileName, saveText);
     }
 
-    private string FromEncryptedBase64(string data)
+    private string FromObscuredBase64(string data)
     {
         if (string.IsNullOrEmpty(data))
         {
@@ -114,12 +129,15 @@ public class SaveFile
 
         byte[] byteArray = Convert.FromBase64String(data);
 
-        Obsure(ref byteArray);
+        if (m_SaveController.ObscureSave)
+        {
+            Obscure(ref byteArray);
+        }
         
         return UTF8Encoding.UTF8.GetString(byteArray);
     }
 
-    private string ToEncryptedBase64(string data)
+    private string ToObscuredBase64(string data)
     {
         if (string.IsNullOrEmpty(data))
         {
@@ -128,8 +146,11 @@ public class SaveFile
 
         byte[] byteArray = UTF8Encoding.UTF8.GetBytes(data);
 
-        Obscure(ref byteArray);
-        
+        if (m_SaveController.ObscureSave)
+        {
+            Obscure(ref byteArray);
+        }
+
         return Convert.ToBase64String(byteArray);
     }
 

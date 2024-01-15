@@ -105,8 +105,11 @@ public class SaveFile
     public void LoadFromFile(string fileName)
     {
         string saveText = File.ReadAllText(Application.persistentDataPath + "/" + fileName);
-        
-        saveText = FromObscuredBase64(saveText);
+
+        if (m_SaveController.ObscureSave)
+        {
+            saveText = FromObscuredBase64(saveText);
+        }
 
         m_Dictionary = JsonUtility.FromJson<SerializedDictionary<string, string>>(saveText);
     }
@@ -115,8 +118,11 @@ public class SaveFile
     {
         string saveText = JsonUtility.ToJson(m_Dictionary);
 
-        saveText = ToObscuredBase64(saveText);
-        
+        if (m_SaveController.ObscureSave)
+        {
+            saveText = ToObscuredBase64(saveText);
+        }
+
         File.WriteAllText(Application.persistentDataPath + "/" + fileName, saveText);
     }
 
@@ -128,12 +134,9 @@ public class SaveFile
         }
 
         byte[] byteArray = Convert.FromBase64String(data);
-
-        if (m_SaveController.ObscureSave)
-        {
-            Obscure(ref byteArray);
-        }
         
+        Obscure(ref byteArray);
+
         return UTF8Encoding.UTF8.GetString(byteArray);
     }
 
@@ -145,11 +148,8 @@ public class SaveFile
         }
 
         byte[] byteArray = UTF8Encoding.UTF8.GetBytes(data);
-
-        if (m_SaveController.ObscureSave)
-        {
-            Obscure(ref byteArray);
-        }
+        
+        Obscure(ref byteArray);
 
         return Convert.ToBase64String(byteArray);
     }
@@ -167,5 +167,7 @@ public class SaveValueKeys
 {
     public const string SAVE_FILE_VERSION = "SaveFileVersion";
     public const string SAVE_TIMESTAMP = "SaveTimestamp";
+    public const string LAST_ROOM_VISITED = "LastRoomVisited";
+    public const string LAST_DOOR_VISITED = "LastDoorVisited";
     public const string COMPLETED_GAME = "CompletedGame";
 }
